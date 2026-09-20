@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JARVIS MARK VII - BILINGUAL HUD</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', monospace; }
+    body {
+      background-color: #000206;
+      color: #00f0ff;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+    }
+    .hud-main {
+      width: 100vw;
+      height: 100vh;
+      max-width: 440px;
+      position: relative;
+      border: 2px solid #00f0ff;
+      background: radial-gradient(circle at center, rgba(0, 40, 90, 0.45) 0%, rgba(0, 3, 8, 0.98) 80%);
+      box-shadow: inset 0 0 50px rgba(0, 240, 255, 0.4), 0 0 25px rgba(0, 240, 255, 0.25);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+      perspective: 1000px;
+    }
+
+    .grid-lines {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* TOP HEADER & CORNER BRACKETS */
+    .hud-header-wrapper {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.4);
+      padding-bottom: 4px;
+    }
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px #00f0ff;
+    }
+    .listening-tag {
+      color: #00ff88;
+      animation: blinkIndicator 1.2s infinite;
+    }
+
+    /* மேல் இடைவெளியை இணைக்கும் ஹைடெக் பேனல் (TOP GAP CONNECTOR) */
+    .top-connector-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 8px;
+      letter-spacing: 1px;
+      background: rgba(0, 25, 55, 0.5);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 3px 6px;
+      border-radius: 2px;
+    }
+    .energy-stream {
+      flex: 1;
+      height: 4px;
+      background: rgba(0, 240, 255, 0.15);
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .energy-stream-fill {
+      position: absolute;
+      height: 100%;
+      width: 45%;
+      background: linear-gradient(90deg, transparent, #00f0ff, #ffffff);
+      box-shadow: 0 0 8px #00f0ff;
+      animation: streamFlow 2s linear infinite;
+    }
+    .top-target-cross {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #7de8ff;
+    }
+    .mini-spinner {
+      width: 10px;
+      height: 10px;
+      border: 1px dashed #00f0ff;
+      border-radius: 50%;
+      animation: spinRight 4s linear infinite;
+    }
+
+    /* SCI-FI SIDE HUD WIDGETS */
+    .hud-mid-section {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      z-index: 2;
+    }
+
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 65px;
+      z-index: 6;
+    }
+
+    .side-box {
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: rgba(0, 20, 45, 0.6);
+      padding: 4px;
+      font-size: 8px;
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .spectrum-bars {
+      display: flex;
+      gap: 2px;
+      align-items: flex-end;
+      height: 25px;
+    }
+    .bar {
+      width: 4px;
+      background: #00f0ff;
+      box-shadow: 0 0 4px #00f0ff;
+      animation: barJump 0.8s infinite alternate ease-in-out;
+    }
+    .bar:nth-child(2) { animation-delay: 0.2s; height: 18px; }
+    .bar:nth-child(3) { animation-delay: 0.4s; height: 24px; }
+    .bar:nth-child(4) { animation-delay: 0.1s; height: 12px; }
+
+    .radar-circle {
+      width: 45px;
+      height: 45px;
+      border: 1px solid rgba(0, 240, 255, 0.6);
+      border-radius: 50%;
+      position: relative;
+      margin: 2px auto;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+    }
+    .radar-line {
+      position: absolute;
+      width: 50%;
+      height: 1px;
+      background: #00ff88;
+      top: 50%;
+      left: 50%;
+      transform-origin: 0 0;
+      animation: spinRadar 2.5s linear infinite;
+    }
+
+    /* CENTER AREA: ARC REACTOR & SPHERE */
+    .center-stage {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-style: preserve-3d;
+    }
+
+    .arc-reactor-plate {
+      position: absolute;
+      width: 270px;
+      height: 270px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.8s ease, opacity 0.8s ease;
+      z-index: 1;
+    }
+    .center-stage.active .arc-reactor-plate {
+      transform: scale(0.85) translateZ(-40px);
+      opacity: 0.35;
+    }
+
+    .outer-dial {
+      position: absolute;
+      width: 265px;
+      height: 265px;
+      border: 2px dashed rgba(0, 240, 255, 0.6);
+      border-radius: 50%;
+      animation: spinRight 24s linear infinite;
+    }
+    .segmented-rim {
+      position: absolute;
+      width: 230px;
+      height: 230px;
+      border: 3px solid transparent;
+      border-top: 4px solid #00f0ff;
+      border-bottom: 4px solid #00f0ff;
+      border-left: 2px dashed #00f0ff;
+      border-right: 2px dashed #00f0ff;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+      animation: spinLeft 14s linear infinite;
+    }
+    .coils-layer {
+      position: absolute;
+      width: 190px;
+      height: 190px;
+      border-radius: 50%;
+      animation: spinRight 30s linear infinite;
+    }
+    .stark-coil {
+      position: absolute;
+      width: 13px;
+      height: 22px;
+      background: linear-gradient(180deg, #ff9900 0%, #00f0ff 100%);
+      left: calc(50% - 6.5px);
+      top: -5px;
+      border-radius: 2px;
+      transform-origin: 6.5px 100px;
+      box-shadow: 0 0 10px #00f0ff;
+    }
+    .triangle-casing {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-left: 36px solid transparent;
+      border-right: 36px solid transparent;
+      border-bottom: 60px solid rgba(0, 240, 255, 0.85);
+      filter: drop-shadow(0 0 20px #00f0ff) drop-shadow(0 0 40px #00f0ff);
+      z-index: 3;
+    }
+    .triangle-glass {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-left: 19px solid transparent;
+      border-right: 19px solid transparent;
+      border-bottom: 34px solid #ffffff;
+      top: 17px;
+      filter: drop-shadow(0 0 12px #ffffff);
+      z-index: 4;
+    }
+
+    #sphere-overlay {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 10;
+      transform: scale(0) translateZ(-50px);
+      opacity: 0;
+      transition: transform 0.8s cubic-bezier(0.15, 0.9, 0.3, 1.2), opacity 0.6s ease;
+    }
+    .center-stage.active #sphere-overlay {
+      transform: scale(1.15) translateZ(70px);
+      opacity: 1;
+    }
+
+    /* BOTTOM CONTROLS */
+    .hud-bottom {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .subtitles-box {
+      min-height: 48px;
+      max-height: 65px;
+      overflow-y: auto;
+      font-size: 11px;
+      text-align: center;
+      background: rgba(0, 20, 45, 0.75);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      padding: 5px;
+      line-height: 1.35;
+      color: #cceeff;
+      text-shadow: 0 0 8px #00f0ff;
+    }
+    .input-row {
+      display: flex;
+      gap: 5px;
+    }
+    .input-field {
+      flex: 1;
+      background: rgba(0, 15, 30, 0.9);
+      border: 1px solid #00f0ff;
+      color: #00f0ff;
+      padding: 7px;
+      font-size: 11px;
+      outline: none;
+    }
+    .action-btn {
+      background: transparent;
+      border: 1px solid #00f0ff;
+      color: #00f0ff;
+      padding: 7px 10px;
+      font-weight: bold;
+      font-size: 10px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+    .action-btn:active { background: #00f0ff; color: #00040a; }
+
+    @keyframes spinRight { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes spinLeft { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+    @keyframes spinRadar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes barJump { from { height: 6px; } to { height: 25px; } }
+    @keyframes streamFlow { 0% { left: -45%; } 100% { left: 100%; } }
+    @keyframes blinkIndicator { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+  </style>
+</head>
+<body>
+
+  <div class="hud-main">
+    <div class="grid-lines"></div>
+
+    <!-- TOP EXPANDED HUD SECTION -->
+    <div class="hud-header-wrapper">
+      <div class="hud-header">
+        <span>STARK INDUSTRIES // MARK VII</span>
+        <span class="listening-tag" id="statusLabel">● STANDBY</span>
+      </div>
+
+      <!-- மேல் இடைவெளியை இணைக்கும் ஹைடெக் பார் -->
+      <div class="top-connector-bar">
+        <div class="top-target-cross">
+          <div class="mini-spinner"></div>
+          <span>SEC // 48.09°N</span>
+        </div>
+        <div class="energy-stream">
+          <div class="energy-stream-fill"></div>
+        </div>
+        <span style="color:#00ff88;">FLUX 100%</span>
+      </div>
+    </div>
+
+    <!-- MIDDLE SECTION: SIDE WIDGETS + CENTER STAGE -->
+    <div class="hud-mid-section">
+      <div class="side-panel">
+        <div class="side-box">
+          <span>AUDIO FLUX</span>
+          <div class="spectrum-bars">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+        <div class="side-box">
+          <span>OUTPUT</span>
+          <span style="color:#00ff88;">99.8%</span>
+        </div>
+      </div>
+
+      <div class="center-stage" id="centerStage">
+        <div class="arc-reactor-plate">
+          <div class="outer-dial"></div>
+          <div class="segmented-rim"></div>
+          <div class="coils-layer" id="coilsLayer"></div>
+          <div class="triangle-casing"></div>
+          <div class="triangle-glass"></div>
+        </div>
+        <div id="sphere-overlay"></div>
+      </div>
+
+      <div class="side-panel">
+        <div class="side-box">
+          <span>RADAR</span>
+          <div class="radar-circle">
+            <div class="radar-line"></div>
+          </div>
+        </div>
+        <div class="side-box">
+          <span>SYS TEMP</span>
+          <span>31.5°C</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM INPUTS & CONTROLS -->
+    <div class="hud-bottom">
+      <div class="subtitles-box" id="subtitles">
+        "Speak or type in English or Tamil. Say 'Jarvis' to activate, Sir."
+      </div>
+
+      <div class="input-row">
+        <input type="text" id="userTextQuery" class="input-field" placeholder="Type your command here..." onkeypress="if(event.key==='Enter') sendManualQuery();" />
+        <button class="action-btn" onclick="sendManualQuery()">SEND</button>
+      </div>
+
+      <input type="password" id="apiKeyInput" class="input-field" placeholder="Enter Gemini API Key..." />
+
+      <div style="display: flex; gap: 5px;">
+        <button class="action-btn" style="flex: 1;" onclick="toggleHandsFree()" id="toggleBtn">ACTIVATE MIC</button>
+        <button class="action-btn" style="flex: 0.35; font-size: 9px;" onclick="saveKey()">SAVE KEY</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 10 Coils Around Core
+    const coilsLayer = document.getElementById('coilsLayer');
+    for (let i = 0; i < 10; i++) {
+      const coil = document.createElement('div');
+      coil.className = 'stark-coil';
+      coil.style.transform = `rotate(${i * 36}deg)`;
+      coilsLayer.appendChild(coil);
+    }
+
+    // Three.js 3D Sphere Setup
+    const sphereOverlay = document.getElementById('sphere-overlay');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+    camera.position.z = 135;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(280, 280);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    sphereOverlay.appendChild(renderer.domElement);
+
+    const count = 2500;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const basePositions = new Float32Array(count * 3);
+    const randomOffsets = new Float32Array(count);
+
+    const baseRadius = 38;
+    for (let i = 0; i < count; i++) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+      const r = Math.cbrt(Math.random()) * 6 + baseRadius;
+
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+
+      basePositions[i * 3] = positions[i * 3];
+      basePositions[i * 3 + 1] = positions[i * 3 + 1];
+      basePositions[i * 3 + 2] = positions[i * 3 + 2];
+
+      randomOffsets[i] = Math.random() * 10;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      color: 0x00f0ff,
+      size: 1.6,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+
+    const particleSphere = new THREE.Points(geometry, material);
+    scene.add(particleSphere);
+
+    let audioLevel = 0;
+    let clock = new THREE.Clock();
+
+    function animateSphere() {
+      requestAnimationFrame(animateSphere);
+      const time = clock.getElapsedTime() * 2.5;
+
+      particleSphere.rotation.y += 0.006;
+      particleSphere.rotation.x += 0.003;
+
+      const pos = geometry.attributes.position.array;
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        const wave = Math.sin(time + randomOffsets[i]) * (1.2 + audioLevel * 7.5);
+        const factor = 1 + (wave / baseRadius) + (audioLevel * 0.45);
+
+        pos[i3] = basePositions[i3] * factor;
+        pos[i3 + 1] = basePositions[i3 + 1] * factor;
+        pos[i3 + 2] = basePositions[i3 + 2] * factor;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      audioLevel *= 0.90;
+
+      renderer.render(scene, camera);
+    }
+    animateSphere();
+
+    function setSphereActive(active) {
+      const stage = document.getElementById('centerStage');
+      if (active) stage.classList.add('active');
+      else stage.classList.remove('active');
+    }
+
+    // --- BILINGUAL VOICE & AI SYSTEM ---
+    let isHandsFree = false;
+    let recognition = null;
+    let isSpeaking = false;
+    let selectedMaleVoice = null;
+    let selectedTamilVoice = null;
+
+    function cacheVoices() {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+
+      const femaleKeywords = ['female', 'zira', 'susan', 'hazel', 'samantha', 'victoria', 'karen'];
+
+      selectedMaleVoice = voices.find(v => {
+        const name = v.name.toLowerCase();
+        const isNotFemale = !femaleKeywords.some(kw => name.includes(kw));
+        const isMaleOrUK = (v.lang === 'en-GB' || name.includes('male') || name.includes('george') || name.includes('david'));
+        return isNotFemale && isMaleOrUK;
+      });
+
+      if (!selectedMaleVoice) {
+        selectedMaleVoice = voices.find(v => v.lang.startsWith('en') && !femaleKeywords.some(kw => v.name.toLowerCase().includes(kw)));
+      }
+
+      selectedTamilVoice = voices.find(v => v.lang.startsWith('ta'));
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = cacheVoices;
+      cacheVoices();
+    }
+
+    window.onload = () => {
+      const saved = localStorage.getItem('jarvis_gemini_key');
+      if (saved) document.getElementById('apiKeyInput').value = saved;
+      cacheVoices();
+    };
+
+    function saveKey() {
+      const k = document.getElementById('apiKeyInput').value.trim();
+      if (k) {
+        localStorage.setItem('jarvis_gemini_key', k);
+        alert("API Key Saved Successfully!");
+      }
+    }
+
+    function speakBilingual(text, isTamil, callback) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      isSpeaking = true;
+      setSphereActive(true);
+
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+      }
+
+      const msg = new SpeechSynthesisUtterance(text);
+      if (!selectedMaleVoice || !selectedTamilVoice) cacheVoices();
+
+      if (isTamil && selectedTamilVoice) {
+        msg.voice = selectedTamilVoice;
+        msg.pitch = 0.85;
+        msg.rate = 0.95;
+      } else {
+        if (selectedMaleVoice) msg.voice = selectedMaleVoice;
+        msg.pitch = 0.75;
+        msg.rate = 0.92;
+      }
+
+      const intv = setInterval(() => {
+        if (isSpeaking) audioLevel = 1.4 + Math.random() * 1.5;
+        else clearInterval(intv);
+      }, 70);
+
+      msg.onend = () => {
+        isSpeaking = false;
+        clearInterval(intv);
+        setTimeout(() => { if (!isSpeaking) setSphereActive(false); }, 1000);
+        if (isHandsFree) setTimeout(restartMic, 250);
+        if (callback) callback();
+      };
+
+      msg.onerror = () => {
+        isSpeaking = false;
+        clearInterval(intv);
+        if (isHandsFree) setTimeout(restartMic, 250);
+      };
+
+      window.speechSynthesis.speak(msg);
+    }
+
+    function restartMic() {
+      if (!isHandsFree || isSpeaking || !recognition) return;
+      try { recognition.start(); } catch(e) {}
+    }
+
+    function initSpeechRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        alert("Speech Recognition is not supported. Use Google Chrome.");
+        return;
+      }
+
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        document.getElementById('statusLabel').innerText = "● LISTENING";
+      };
+
+      recognition.onresult = (e) => {
+        if (isSpeaking) return;
+        const rawText = e.results[0][0].transcript.trim();
+        document.getElementById('subtitles').innerText = `Input: "${rawText}"`;
+        audioLevel = 2.0;
+        setSphereActive(true);
+
+        const lower = rawText.toLowerCase();
+        if (lower.includes('jarvis')) {
+          const cleanQuery = rawText.replace(/jarvis/gi, '').trim();
+          if (cleanQuery.length > 2) askAI(cleanQuery);
+          else speakBilingual("At your service, Sir. What can I do for you?", false);
+        } else {
+          askAI(rawText);
+        }
+      };
+
+      recognition.onend = () => {
+        document.getElementById('statusLabel').innerText = "● STANDBY";
+        if (isHandsFree && !isSpeaking) setTimeout(restartMic, 300);
+      };
+    }
+
+    function toggleHandsFree() {
+      const btn = document.getElementById('toggleBtn');
+      const st = document.getElementById('statusLabel');
+
+      if (!isHandsFree) {
+        isHandsFree = true;
+        if (!recognition) initSpeechRecognition();
+        btn.innerText = "DEACTIVATE MIC";
+        btn.style.borderColor = "#00ff88";
+        btn.style.color = "#00ff88";
+        st.innerText = "● LISTENING";
+        speakBilingual("Bilingual acoustic neural core online, Sir. I am listening.", false);
+      } else {
+        isHandsFree = false;
+        if 
